@@ -1,0 +1,65 @@
+# docker_write_security.rules — Dockerfile and Docker Compose security.
+# Technology: docker | Capability: write
+# Covers: root user, latest tag, ADD vs COPY, secrets in ENV, exposed ports.
+
+rule no-run-as-root {
+  enabled true
+  priority 90
+  severity error
+  DENY write
+  IF path GLOB "**/Dockerfile" AND content NOT CONTAINS "USER "
+  OR path GLOB "**/Dockerfile*" AND content NOT CONTAINS "USER "
+  MESSAGE "Dockerfile does not set a non-root USER. Containers running as root are a significant security risk. Add 'USER nonroot' or create a dedicated user."
+}
+
+rule no-latest-tag {
+  enabled true
+  priority 85
+  severity error
+  DENY write
+  IF path GLOB "**/Dockerfile" AND content LINE_REGEX "^FROM \\S+:latest"
+  OR path GLOB "**/Dockerfile*" AND content LINE_REGEX "^FROM \\S+:latest"
+  OR path GLOB "**/Dockerfile" AND content LINE_REGEX "^FROM \\S+$"
+  MESSAGE "Using ':latest' or no tag in FROM makes builds non-reproducible. Pin to a specific version: FROM node:20.11.1-alpine3.19"
+}
+
+rule no-add-for-files {
+  enabled true
+  priority 75
+  severity warning
+  ASK write
+  IF path GLOB "**/Dockerfile" AND content LINE_REGEX "^ADD (?!https?://)"
+  OR path GLOB "**/Dockerfile*" AND content LINE_REGEX "^ADD (?!https?://)"
+  MESSAGE "Use COPY instead of ADD for local files. ADD has hidden behaviors (auto-extraction of archives, URL fetching) — COPY is explicit and safe."
+  PROMPT "Is this ADD needed for auto-extraction or a URL? If copying local files, replace with COPY for clarity and safety."
+}
+
+rule no-secrets-in-env {
+  enabled true
+  priority 95
+  severity error
+  DENY write
+  IF path GLOB "**/Dockerfile" AND content LINE_REGEX "ENV\\s+(PASSWORD|SECRET|API_KEY|TOKEN|PRIVATE_KEY)\\s*="
+  OR path GLOB "**/docker-compose*.yml" AND content LINE_REGEX "\\s+(PASSWORD|SECRET|API_KEY|TOKEN):\\s*[^$]"
+  MESSAGE "Secrets in Dockerfile ENV or docker-compose hardcoded values are baked into the image and visible in 'docker inspect'. Use Docker secrets or runtime env injection."
+}
+
+rule no-privileged-container {
+  enabled true
+  priority 95
+  severity error
+  DENY write
+  IF path GLOB "**/docker-compose*.yml" AND content CONTAINS "privileged: true"
+  MESSAGE "Privileged containers have full access to the host kernel — equivalent to root on the host. Remove 'privileged: true' and use specific capabilities instead."
+}
+
+rule no-expose-all-ports {
+  enabled true
+  priority 70
+  severity warning
+  ASK write
+  IF path GLOB "**/docker-compose*.yml" AND content LINE_REGEX "ports:\\s*$"
+  OR path GLOB "**/docker-compose*.yml" AND content LINE_REGEX "- \"0\\.0\\.0\\.0:"
+  MESSAGE "Binding to 0.0.0.0 exposes the port on all network interfaces. Bind to 127.0.0.1 for development: '127.0.0.1:8080:8080'"
+  PROMPT "Should this port be accessible externally? For local development, bind to 127.0.0.1 instead of 0.0.0.0."
+}

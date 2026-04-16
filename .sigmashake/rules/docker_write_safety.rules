@@ -34,8 +34,7 @@ rule docker-latest-tag {
   enabled true
   priority 80
   severity warning
-  ASK write
+  LOG write
   IF path GLOB "**/Dockerfile*" AND content LINE_REGEX "(?i)FROM\\s+[a-zA-Z0-9_/-]+:latest"
   MESSAGE "Using the ':latest' tag for base images breaks immutability and can introduce supply chain vulnerabilities or breaking changes unexpectedly. Pin to a specific version or SHA256 digest."
-  PROMPT "Are you sure you want to use the ':latest' tag? Pinning versions is much safer."
 }

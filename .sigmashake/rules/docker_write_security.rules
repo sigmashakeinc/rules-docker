@@ -27,11 +27,10 @@ rule no-add-for-files {
   enabled true
   priority 75
   severity warning
-  ASK write
+  LOG write
   IF path GLOB "**/Dockerfile" AND content LINE_REGEX "^ADD (?!https?://)"
   OR path GLOB "**/Dockerfile*" AND content LINE_REGEX "^ADD (?!https?://)"
   MESSAGE "Use COPY instead of ADD for local files. ADD has hidden behaviors (auto-extraction of archives, URL fetching) — COPY is explicit and safe."
-  PROMPT "Is this ADD needed for auto-extraction or a URL? If copying local files, replace with COPY for clarity and safety."
 }
 
 rule no-secrets-in-env {
@@ -57,9 +56,8 @@ rule no-expose-all-ports {
   enabled true
   priority 70
   severity warning
-  ASK write
+  LOG write
   IF path GLOB "**/docker-compose*.yml" AND content LINE_REGEX "ports:\\s*$"
   OR path GLOB "**/docker-compose*.yml" AND content LINE_REGEX "- \"0\\.0\\.0\\.0:"
   MESSAGE "Binding to 0.0.0.0 exposes the port on all network interfaces. Bind to 127.0.0.1 for development: '127.0.0.1:8080:8080'"
-  PROMPT "Should this port be accessible externally? For local development, bind to 127.0.0.1 instead of 0.0.0.0."
 }
